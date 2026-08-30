@@ -9,6 +9,8 @@ MiniMax H3 模式切换器自定义节点
 """
 import math
 import node_helpers
+import comfy.sd
+import folder_paths
 
 # 复用官方 MiniMax H3 节点的辅助函数和常量
 try:
@@ -54,6 +56,16 @@ class MiniMaxH3ModeSwitcher:
                                "Ref2VA：用参考图锁定角色身份，适合开场/锚点段。\n"
                                "FL2VA：用首帧/尾帧控制画面起止，适合衔接段。\n"
                                "混合：同时使用参考图和首尾帧，角色一致性最强。"
+                }),
+                "ref2va_model": (folder_paths.get_filename_list("diffusion_models"), {
+                    "tooltip": "Ref2VA / 混合模式使用的 UNET 模型。\n切换到 Ref2VA 或混合模式时自动加载此模型。"
+                }),
+                "fl2va_model": (folder_paths.get_filename_list("diffusion_models"), {
+                    "tooltip": "FL2VA 模式使用的 UNET 模型。\n切换到 FL2VA 模式时自动加载此模型。"
+                }),
+                "weight_dtype": (["default", "fp8_e4m3fn", "fp8_e4m3fn_fast", "fp8_e5m2"], {
+                    "default": "default",
+                    "tooltip": "模型权重精度。default=自动，fp8=省显存（需显卡支持）。"
                 }),
                 "clip": ("CLIP",),
                 "vae": ("VAE",),
@@ -120,12 +132,12 @@ class MiniMaxH3ModeSwitcher:
             }
         }
 
-    RETURN_TYPES = ("CONDITIONING", "LATENT")
-    RETURN_NAMES = ("positive", "LATENT")
+    RETURN_TYPES = ("MODEL", "CONDITIONING", "LATENT")
+    RETURN_NAMES = ("MODEL", "positive", "LATENT")
     FUNCTION = "encode"
     CATEGORY = "MiniMax H3"
 
-    def encode(self, mode, clip, vae, audio_vae, prompt, width, height, length,
+    def encode(self, mode, ref2va_model, fl2va_model, weight_dtype, clip, vae, audio_vae, prompt, width, height, length,
                ref_image_0=None, ref_image_1=None, ref_image_2=None, ref_image_3=None,
                ref_image_4=None, ref_image_5=None, ref_image_6=None, ref_image_7=None,
                ref_image_8=None,
@@ -136,6 +148,24 @@ class MiniMaxH3ModeSwitcher:
                 "无法导入官方 MiniMax H3 辅助函数。请更新 ComfyUI 到最新版本 "
                 "(需要包含 comfy_extras/nodes_minimax_h3.py)。"
             )
+
+        # ===== 根据 mode 自动加载对应 UNET 模型 =====
+        # FL2VA 模式用 fl2va 模型，Ref2VA 和混合模式用 ref2va 模型
+        if "FL2VA" in mode and "混合" not in mode:
+            model_name = fl2va_model
+            model_kind = "FL2VA"
+        else:
+            model_name = ref2va_model
+            model_kind = "Ref2VA"
+
+        if not model_name:
+            raise ValueError(
+                f"当前模式为「{mode}」，但未选择对应的 UNET 模型。\n"
+                f"请在节点的 {model_kind}_model 下拉菜单中选择模型文件。"
+            )
+
+        print(f"[MiniMaxH3ModeSwitcher] 模式={mode}，加载 {model_kind} 模型: {model_name}")
+        model = comfy.sd.load_unet(model_name, weight_dtype)
 
         # 判断当前模式启用哪些分支
         use_ref2va = "Ref2VA" in mode or "混合" in mode
@@ -220,7 +250,7 @@ class MiniMaxH3ModeSwitcher:
         if payload:
             cond = node_helpers.conditioning_set_values(cond, payload)
 
-        return (cond, latent)
+        return (model, cond, latent)
 
 
 # ============================================================
