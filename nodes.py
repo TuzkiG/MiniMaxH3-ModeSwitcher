@@ -78,7 +78,7 @@ class MiniMaxH3ModeSwitcher:
                 }),
             },
             "optional": {
-                # ===== Ref2VA / 混合模式专用 =====
+                # ===== Ref2VA / 混合模式专用（最多9张，与官方节点对齐）=====
                 "ref_image_0": ("IMAGE", {
                     "tooltip": "角色参考图1（对应 <Picture 1>）。Ref2VA/混合模式必填。"
                 }),
@@ -90,6 +90,21 @@ class MiniMaxH3ModeSwitcher:
                 }),
                 "ref_image_3": ("IMAGE", {
                     "tooltip": "角色参考图4（对应 <Picture 4>）。可选。"
+                }),
+                "ref_image_4": ("IMAGE", {
+                    "tooltip": "角色参考图5（对应 <Picture 5>）。可选。"
+                }),
+                "ref_image_5": ("IMAGE", {
+                    "tooltip": "角色参考图6（对应 <Picture 6>）。可选。"
+                }),
+                "ref_image_6": ("IMAGE", {
+                    "tooltip": "角色参考图7（对应 <Picture 7>）。可选。"
+                }),
+                "ref_image_7": ("IMAGE", {
+                    "tooltip": "角色参考图8（对应 <Picture 8>）。可选。"
+                }),
+                "ref_image_8": ("IMAGE", {
+                    "tooltip": "角色参考图9（对应 <Picture 9>）。可选。"
                 }),
                 "ref_image_size": (["match", "max"], {
                     "default": "match",
@@ -112,6 +127,8 @@ class MiniMaxH3ModeSwitcher:
 
     def encode(self, mode, clip, vae, audio_vae, prompt, width, height, length,
                ref_image_0=None, ref_image_1=None, ref_image_2=None, ref_image_3=None,
+               ref_image_4=None, ref_image_5=None, ref_image_6=None, ref_image_7=None,
+               ref_image_8=None,
                ref_image_size="match", first_frame=None, last_frame=None):
 
         if not OFFICIAL_HELPERS_AVAILABLE:
@@ -125,9 +142,11 @@ class MiniMaxH3ModeSwitcher:
         use_fl2va = "FL2VA" in mode or "混合" in mode
 
         # 模式输入校验
-        if use_ref2va and ref_image_0 is None and ref_image_1 is None:
+        all_ref_images = [ref_image_0, ref_image_1, ref_image_2, ref_image_3,
+                          ref_image_4, ref_image_5, ref_image_6, ref_image_7, ref_image_8]
+        if use_ref2va and all(img is None for img in all_ref_images):
             raise ValueError(
-                f"当前模式为「{mode}」，需要至少连接一张参考图（ref_image_0 或 ref_image_1）。\n"
+                f"当前模式为「{mode}」，需要至少连接一张参考图（ref_image_0 ~ ref_image_8）。\n"
                 f"如果只想用首尾帧，请切换到「FL2VA (首尾帧)」模式。"
             )
         if use_fl2va and first_frame is None and last_frame is None and "混合" not in mode:
@@ -158,10 +177,7 @@ class MiniMaxH3ModeSwitcher:
 
         # ========== Ref2VA 分支：角色参考图 ==========
         if use_ref2va:
-            ref_images_list = [
-                img for img in [ref_image_0, ref_image_1, ref_image_2, ref_image_3]
-                if img is not None
-            ]
+            ref_images_list = [img for img in all_ref_images if img is not None]
 
             for img in ref_images_list:
                 h, w = img.shape[1], img.shape[2]
