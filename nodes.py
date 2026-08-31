@@ -92,7 +92,7 @@ class MiniMaxH3ModeSwitcher:
             "optional": {
                 # ===== Ref2VA / 混合模式专用（最多9张，与官方节点对齐）=====
                 "ref_image_0": ("IMAGE", {
-                    "tooltip": "角色参考图1（对应 <Picture 1>）。Ref2VA/混合模式必填。"
+                    "tooltip": "角色参考图1（对应 <Picture 1>）。可选——不连接时自动降级为文生视频运行。"
                 }),
                 "ref_image_1": ("IMAGE", {
                     "tooltip": "角色参考图2（对应 <Picture 2>）。可选。"
@@ -124,10 +124,10 @@ class MiniMaxH3ModeSwitcher:
                 }),
                 # ===== FL2VA / 混合模式专用 =====
                 "first_frame": ("IMAGE", {
-                    "tooltip": "首帧图片。FL2VA/混合模式建议填写，等于上一段最后一帧。"
+                    "tooltip": "首帧图片。可选——不连接时自动跳过。FL2VA/混合模式建议填写，等于上一段最后一帧。"
                 }),
                 "last_frame": ("IMAGE", {
-                    "tooltip": "尾帧图片（可选）。用于精准控制结束画面。"
+                    "tooltip": "尾帧图片。可选——不连接时自动跳过。用于精准控制结束画面。"
                 }),
             }
         }
@@ -171,16 +171,16 @@ class MiniMaxH3ModeSwitcher:
         use_ref2va = "Ref2VA" in mode or "混合" in mode
         use_fl2va = "FL2VA" in mode or "混合" in mode
 
-        # 模式输入校验
+        # ===== 模式输入校验（v4：角色图/首尾帧全部可选，未连接时自动降级运行）=====
         all_ref_images = [ref_image_0, ref_image_1, ref_image_2, ref_image_3,
                           ref_image_4, ref_image_5, ref_image_6, ref_image_7, ref_image_8]
-        if use_ref2va and all(img is None for img in all_ref_images):
-            raise ValueError(
-                f"当前模式为「{mode}」，需要至少连接一张参考图（ref_image_0 ~ ref_image_8）。\n"
-                f"如果只想用首尾帧，请切换到「FL2VA (首尾帧)」模式。"
-            )
+        n_refs = len([img for img in all_ref_images if img is not None])
+        if use_ref2va and n_refs == 0:
+            print(f"[MiniMaxH3ModeSwitcher] 警告：模式为「{mode}」但未连接角色参考图，"
+                  f"将以文生视频模式运行。如需角色一致性，请连接 ref_image_0~8。")
         if use_fl2va and first_frame is None and last_frame is None and "混合" not in mode:
             print(f"[MiniMaxH3ModeSwitcher] 警告：FL2VA 模式未连接首帧/尾帧，将以文生视频模式运行。")
+        # 首帧/尾帧本身始终可选：未连接即跳过，不影响运行
 
         # 创建空的音视频 latent
         latent, frame_count = _empty_av_latent(width, height, length)
